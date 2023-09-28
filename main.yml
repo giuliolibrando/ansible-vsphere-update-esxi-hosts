@@ -1,6 +1,6 @@
 ---
-- hosts: all
-#  serial: 1
+- hosts: all 
+  serial: 1
   gather_facts: false
   
   vars_files:
@@ -22,46 +22,13 @@
      state: present
      
   - debug: var=status.msg
-  
-#not required - this is a workaround for older cpus
-  - name: Trick per vecchie cpu
-    lineinfile:
-      path: /bootbank/boot.cfg
-      backrefs: 'yes'
-      regexp: ^(.*kernelopt.*)$
-      line: '\1, allowLegacyCPU=true'
-#not required - this is a workaround for older cpus
-  - name: Trick per vecchie cpu
-    lineinfile:
-      path: /altbootbank/boot.cfg
-      backrefs: 'yes'
-      regexp: ^(.*kernelopt.*)$
-      line: '\1, allowLegacyCPU=true'
-      
-  - name: Set the state of a host system to reboot
-    delegate_to: localhost
-    register: reboot_host
-    community.vmware.vmware_host_powerstate:
-      validate_certs: no
-      hostname: '{{ vcenter_hostname }}'
-      username: '{{ vcenter_username }}'
-      password: '{{ vcenter_password }}'
-      esxi_hostname: '{{ inventory_hostname }}'
-      state: reboot-host
-      
-  - name: Wait for system to become reachable
-    wait_for_connection:
-      delay: 360
-      sleep: 60
-      timeout: 3600
+    
 
 
   - name: Install
-    shell: esxcli software profile update -d /path/to/esxiupdate.zip -p packageversionname --no-hardware-warning
+    shell: esxcli software profile update -d {{ esxi_file_zip }} -p {{ esxi_profile }} --no-hardware-warning
    
 
-
-  
   - name: Set the state of a host system to reboot
     delegate_to: localhost
     register: reboot_host
@@ -81,13 +48,25 @@
       sleep: 60
       timeout: 3600
       
+  - pause:
+      minutes: 1
+      
   - name: Confirm VIB is installed
-    shell: esxcli software vib list | grep #something useful (ex. "6.7")  
+    shell: esxcli software vib list | grep {{ version_check }}    
     register: vibs
     changed_when: false
     ignore_errors: yes
     
   - debug: var=vibs.stdout
+  
+  
+  - name: Add license key
+    shell: vim-cmd vimsvc/license --set {{ license_key }}
+    register: key
+    changed_when: false
+    ignore_errors: yes
+    
+  - debug: var=key.stdout
     
   - name: Exit Maintenance Mode
     delegate_to: localhost
@@ -105,3 +84,5 @@
     
 
   - debug: var=mainteance.status   
+
+
